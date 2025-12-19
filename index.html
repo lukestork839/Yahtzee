@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Yah-douche-lick-it: Final</title>
+    <title>Yah-douche-lick-it: Animated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         /* --- GLOBAL STYLES --- */
@@ -11,24 +11,25 @@
             color: white;
             text-align: center;
             padding: 0; margin: 0;
-            touch-action: manipulation; /* Improves touch response */
+            touch-action: manipulation;
         }
 
         h1 { margin: 15px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); font-size: 24px; }
 
-        /* SCREENS (We show/hide these) */
+        /* SCREENS */
         .screen { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
         .active-screen { display: block; animation: fadeIn 0.3s; }
 
-        /* --- SETUP SCREEN --- */
+        /* SETUP SCREEN */
         .setup-box { background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         input[type="text"] { font-size: 18px; padding: 10px; margin: 5px; width: 80%; border: 1px solid #ccc; border-radius: 5px; }
         
-        /* --- GAME BOARD --- */
+        /* GAME BOARD */
         .game-header { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 10px; margin-bottom: 15px; }
         .player-badge { font-weight: bold; font-size: 18px; color: #f1c40f; }
         
         .dice-container { display: flex; justify-content: center; gap: 8px; margin: 20px 0; min-height: 65px; }
+        
         .die {
             width: 55px; height: 55px;
             background-color: white; color: black;
@@ -38,11 +39,33 @@
             cursor: pointer;
             box-shadow: 3px 3px 5px rgba(0,0,0,0.4);
             user-select: none;
-            transition: transform 0.1s;
+            transition: transform 0.1s, background-color 0.2s;
         }
+
         .die.held { background-color: #e74c3c; color: white; transform: translateY(8px); box-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
 
-        /* --- SCORECARD --- */
+        /* --- THE SHAKE ANIMATION --- */
+        .die.rolling {
+            animation: rumble 0.5s linear infinite;
+            background-color: #ddd; /* Dim slightly while rolling */
+            color: transparent; /* Hide number while rolling */
+        }
+
+        @keyframes rumble {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-5deg); }
+            20% { transform: translate(-3px, 0px) rotate(5deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(5deg); }
+            50% { transform: translate(-1px, 2px) rotate(-5deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-5deg); }
+            80% { transform: translate(-1px, -1px) rotate(5deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-5deg); }
+        }
+
+        /* SCORECARD */
         .scorecard { background: white; color: #333; border-radius: 10px; padding: 10px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
         table { width: 100%; border-collapse: collapse; }
         th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
@@ -59,7 +82,7 @@
         .bonus-row { background-color: #fef9e7; color: #d35400; font-weight: bold; font-size: 12px; }
         .total-row { background-color: #2c3e50; color: white; font-weight: bold; font-size: 16px; }
 
-        /* --- BUTTONS --- */
+        /* BUTTONS */
         .btn-main {
             padding: 15px 30px; font-size: 20px;
             background-color: #f1c40f; color: #2c3e50;
@@ -68,16 +91,13 @@
             margin-top: 10px;
         }
         .btn-main:active { transform: translateY(4px); box-shadow: none; }
-        .btn-main:disabled { background-color: #95a5a6; color: #ecf0f1; box-shadow: none; }
+        .btn-main:disabled { background-color: #95a5a6; color: #ecf0f1; box-shadow: none; cursor: wait; }
 
-        /* --- INTERSTITIAL (Pass Phone) --- */
         .pass-phone-box { background: #34495e; padding: 40px; border-radius: 15px; margin-top: 50px; }
         
-        /* --- ANIMATIONS --- */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* --- FINAL TABLE --- */
         .leaderboard-table td { font-size: 18px; padding: 10px; }
         .winner { color: #f1c40f; font-weight: bold; }
     </style>
@@ -138,8 +158,7 @@
         <h1>Game Over!</h1>
         <div class="setup-box">
             <h3>Final Scores</h3>
-            <table class="leaderboard-table" id="final-table">
-                </table>
+            <table class="leaderboard-table" id="final-table"></table>
             <br>
             <button class="btn-main" onclick="location.reload()">Play Again</button>
         </div>
@@ -157,51 +176,35 @@
             {id: 'chance', label: 'Chance'}
         ];
 
-        // --- STATE ---
-        let players = []; // Array of objects {name: "Dad", scores: {...}, yahtzeeBonus: 0}
+        let players = [];
         let currentPlayerIdx = 0;
-        let currentRound = 1; // 1 to 13
+        let currentRound = 1;
         
-        // DUPLICATE LOGIC: 13 Arrays. Each array contains 1000 random numbers for that round.
         let roundQueues = []; 
         let queuePointer = 0;
 
-        // Turn State
         let currentDice = [0,0,0,0,0];
         let heldDice = [false,false,false,false,false];
         let rollsLeft = 3;
         let turnActive = false;
+        let isRolling = false; // Prevents spam clicking
 
-        // --- SETUP ---
         function startGame() {
-            // 1. Get Players
             players = [];
             for(let i=1; i<=4; i++) {
                 let name = document.getElementById('p'+i+'-name').value.trim();
-                if(name) {
-                    players.push(createPlayer(name));
-                }
+                if(name) players.push(createPlayer(name));
             }
             if(players.length === 0) return alert("Enter at least 1 name!");
-
-            // 2. Generate the "Destiny" Queues for 13 rounds
             generateGameQueues();
-
-            // 3. Start Game
-            currentRound = 1;
-            currentPlayerIdx = 0;
+            currentRound = 1; currentPlayerIdx = 0;
             showPassScreen();
         }
 
         function createPlayer(name) {
             let emptyScores = {};
             CATEGORIES.forEach(c => { if(c.id !== 'sep') emptyScores[c.id] = null; });
-            return {
-                name: name,
-                scores: emptyScores,
-                yahtzeeBonus: 0,
-                upperBonus: 0
-            };
+            return { name: name, scores: emptyScores, yahtzeeBonus: 0, upperBonus: 0 };
         }
 
         function generateGameQueues() {
@@ -213,89 +216,84 @@
             }
         }
 
-        // --- FLOW CONTROL ---
-
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
             document.getElementById(id).classList.add('active-screen');
         }
 
         function showPassScreen() {
-            if(currentRound > 13) {
-                endGame();
-                return;
-            }
+            if(currentRound > 13) { endGame(); return; }
             document.getElementById('next-player-name').innerText = players[currentPlayerIdx].name;
             document.getElementById('interstitial-round').innerText = currentRound;
             showScreen('screen-pass');
         }
 
         function startTurn() {
-            // 1. Reset Board Visuals
-            rollsLeft = 3;
-            turnActive = false; // Waiting for first roll
-            currentDice = [0,0,0,0,0];
-            heldDice = [false,false,false,false,false];
-            
-            // 2. DUPLICATE LOGIC: Reset Pointer to 0 for this round's queue!
+            rollsLeft = 3; turnActive = false; currentDice = [0,0,0,0,0]; heldDice = [false,false,false,false,false]; isRolling = false;
             queuePointer = 0; 
-            
-            // 3. UI Update
             document.getElementById('current-player-badge').innerText = players[currentPlayerIdx].name;
             document.getElementById('game-round').innerText = currentRound;
             document.getElementById('roll-btn').disabled = false;
             document.getElementById('roll-btn').innerText = "Roll Dice";
             document.getElementById('notification-area').style.display = 'none';
-            
-            renderDice();
-            renderScorecard(); // Render THIS player's scores
+            renderDice(); renderScorecard();
             showScreen('screen-game');
         }
 
         function nextPlayer() {
             currentPlayerIdx++;
-            if(currentPlayerIdx >= players.length) {
-                // All players finished this round
-                currentPlayerIdx = 0;
-                currentRound++;
-            }
+            if(currentPlayerIdx >= players.length) { currentPlayerIdx = 0; currentRound++; }
             showPassScreen();
         }
 
-        // --- GAMEPLAY LOGIC ---
-
+        // --- ANIMATED ROLL LOGIC ---
         function rollDice() {
-            // First roll of the turn?
-            if(!turnActive && rollsLeft === 3) {
-                turnActive = true;
-            }
+            if(isRolling) return; // Prevent double clicks
+            
+            if(!turnActive && rollsLeft === 3) turnActive = true;
 
             if(rollsLeft > 0) {
+                isRolling = true; // Lock controls
                 rollsLeft--;
-                
-                // Fetch numbers from the CURRENT ROUND'S QUEUE
-                let currentQueue = roundQueues[currentRound - 1];
+                document.getElementById('roll-btn').disabled = true; // Disable button while shaking
 
+                // 1. ADD ANIMATION CLASS
+                const diceElements = document.getElementById('dice-area').children;
                 for(let i=0; i<5; i++) {
                     if(!heldDice[i]) {
-                        // Grab next number
-                        currentDice[i] = currentQueue[queuePointer];
-                        queuePointer++;
+                        if(diceElements[i]) diceElements[i].classList.add('rolling');
                     }
                 }
-                
-                renderDice();
-                calculatePotentialScores();
-            }
 
-            if(rollsLeft === 0) {
-                document.getElementById('roll-btn').disabled = true;
-                document.getElementById('roll-btn').innerText = "Select Score";
+                // 2. WAIT FOR ANIMATION (600ms)
+                setTimeout(() => {
+                    // 3. UPDATE NUMBERS
+                    let currentQueue = roundQueues[currentRound - 1];
+                    for(let i=0; i<5; i++) {
+                        if(!heldDice[i]) {
+                            currentDice[i] = currentQueue[queuePointer];
+                            queuePointer++;
+                        }
+                    }
+                    
+                    // 4. RENDER NEW STATE
+                    renderDice(); // This removes the old divs (and the 'rolling' class) automatically
+                    calculatePotentialScores();
+                    
+                    isRolling = false; // Unlock
+                    
+                    if(rollsLeft > 0) {
+                        document.getElementById('roll-btn').disabled = false;
+                    } else {
+                        document.getElementById('roll-btn').innerText = "Select Score";
+                    }
+
+                }, 600); // 600ms delay matches the animation + a tiny pause
             }
         }
 
         function toggleHold(idx) {
-            if(!turnActive) return;
+            if(!turnActive || isRolling) return; // Cannot hold while rolling
             heldDice[idx] = !heldDice[idx];
             renderDice();
         }
@@ -308,22 +306,17 @@
             for(let i=0; i<5; i++) {
                 let d = document.createElement('div');
                 d.className = 'die' + (heldDice[i] ? ' held' : '');
-                // Show '?' if turn hasn't started
                 d.innerText = (!turnActive) ? '?' : currentDice[i];
                 d.onclick = () => toggleHold(i);
                 area.appendChild(d);
             }
         }
 
-        // --- SCORING ENGINE ---
-
         function calculatePotentialScores() {
             let p = players[currentPlayerIdx];
             let counts = [0,0,0,0,0,0,0];
             currentDice.forEach(x => counts[x]++);
             let isYahtzee = counts.some(c => c===5);
-            
-            // Joker Check: Have Yahtzee(50) already?
             let isJoker = false;
             if(isYahtzee && p.scores['yahtzee'] === 50) {
                 isJoker = true;
@@ -333,10 +326,8 @@
                 document.getElementById('notification-area').style.display = 'none';
             }
 
-            // Update UI buttons
             CATEGORIES.forEach(cat => {
                 if(cat.id === 'sep') return;
-                // Only if score is open
                 if(p.scores[cat.id] === null) {
                     let pts = getPoints(cat.id, currentDice, isJoker);
                     let btn = document.getElementById('btn-'+cat.id);
@@ -353,21 +344,15 @@
             let counts = [0,0,0,0,0,0,0];
             let sum = 0;
             dice.forEach(x => { counts[x]++; sum+=x; });
-
-            // Joker Overrides
             if(isJoker) {
-                // Must fill Upper if available
-                if(['ones','twos','threes','fours','fives','sixes'].includes(catId)) {
-                    // Standard rules apply
-                } else {
-                    // Lower section forced points
+                if(['ones','twos','threes','fours','fives','sixes'].includes(catId)) { } 
+                else {
                     if(catId === 'fullhouse') return 25;
                     if(catId === 'smstraight') return 30;
                     if(catId === 'lgstraight') return 40;
                     if(catId === 'chance' || catId === '3kind' || catId === '4kind') return sum;
                 }
             }
-
             switch(catId) {
                 case 'ones': return counts[1]*1;
                 case 'twos': return counts[2]*2;
@@ -377,15 +362,9 @@
                 case 'sixes': return counts[6]*6;
                 case '3kind': return counts.some(c=>c>=3)?sum:0;
                 case '4kind': return counts.some(c=>c>=4)?sum:0;
-                case 'fullhouse': 
-                    let h3=counts.some(c=>c===3), h2=counts.some(c=>c===2), h5=counts.some(c=>c===5);
-                    return (h3&&h2)||h5 ? 25 : 0;
-                case 'smstraight':
-                    let s = counts.slice(1).map(c=>c>0?'1':'0').join('');
-                    return s.includes('1111') ? 30 : 0;
-                case 'lgstraight':
-                    let s2 = counts.slice(1).map(c=>c>0?'1':'0').join('');
-                    return s2.includes('11111') ? 40 : 0;
+                case 'fullhouse': let h3=counts.some(c=>c===3), h2=counts.some(c=>c===2), h5=counts.some(c=>c===5); return (h3&&h2)||h5 ? 25 : 0;
+                case 'smstraight': let s = counts.slice(1).map(c=>c>0?'1':'0').join(''); return s.includes('1111') ? 30 : 0;
+                case 'lgstraight': let s2 = counts.slice(1).map(c=>c>0?'1':'0').join(''); return s2.includes('11111') ? 40 : 0;
                 case 'yahtzee': return counts.some(c=>c===5)?50:0;
                 case 'chance': return sum;
                 default: return 0;
@@ -393,21 +372,13 @@
         }
 
         function confirmScore(catId, pts, isJoker) {
+            if(isRolling) return; 
             let p = players[currentPlayerIdx];
-            
-            // Save Score
             p.scores[catId] = pts;
-            
-            // Handle Bonuses
             if(isJoker) p.yahtzeeBonus += 100;
-
-            // Check Upper Bonus
             let upperSum = 0;
-            ['ones','twos','threes','fours','fives','sixes'].forEach(k => {
-                if(p.scores[k] !== null) upperSum += p.scores[k];
-            });
-            if(upperSum >= 63) p.upperBonus = 35; else p.upperBonus = 0;
-
+            ['ones','twos','threes','fours','fives','sixes'].forEach(k => { if(p.scores[k] !== null) upperSum += p.scores[k]; });
+            p.upperBonus = (upperSum >= 63) ? 35 : 0;
             nextPlayer();
         }
 
@@ -415,52 +386,30 @@
             let p = players[currentPlayerIdx];
             const tbody = document.getElementById('score-table-body');
             tbody.innerHTML = '';
-
             CATEGORIES.forEach(cat => {
-                if(cat.id === 'sep') {
-                    tbody.innerHTML += `<tr><td colspan="2" style="background:#eee; height:4px; padding:0;"></td></tr>`;
-                    return;
-                }
-                
+                if(cat.id === 'sep') { tbody.innerHTML += `<tr><td colspan="2" style="background:#eee; height:4px; padding:0;"></td></tr>`; return; }
                 let val = p.scores[cat.id];
-                let displayVal = (val === null) ? 
-                    `<button id="btn-${cat.id}" class="score-btn">-</button>` : 
-                    `<span class="score-taken">${val}</span>`;
-                
+                let displayVal = (val === null) ? `<button id="btn-${cat.id}" class="score-btn">-</button>` : `<span class="score-taken">${val}</span>`;
                 tbody.innerHTML += `<tr><td>${cat.label}</td><td style="text-align:center;">${displayVal}</td></tr>`;
             });
-
-            // Footer
             let upperSum = 0;
-            ['ones','twos','threes','fours','fives','sixes'].forEach(k => {
-                if(p.scores[k] !== null) upperSum += p.scores[k];
-            });
-            
+            ['ones','twos','threes','fours','fives','sixes'].forEach(k => { if(p.scores[k] !== null) upperSum += p.scores[k]; });
             document.getElementById('ui-upper-bonus').innerText = `${p.upperBonus} (Sum: ${upperSum})`;
             document.getElementById('ui-yahtzee-bonus').innerText = p.yahtzeeBonus;
-            
-            // Calc Total
             let total = p.yahtzeeBonus + p.upperBonus;
             Object.values(p.scores).forEach(v => { if(v!==null) total += v; });
             document.getElementById('ui-grand-total').innerText = total;
         }
 
-        // --- END GAME ---
         function endGame() {
             showScreen('screen-over');
             const table = document.getElementById('final-table');
-            
-            // Calculate totals
             let results = players.map(p => {
                 let total = p.yahtzeeBonus + p.upperBonus;
                 Object.values(p.scores).forEach(v => { if(v!==null) total += v; });
                 return { name: p.name, total: total };
             });
-
-            // Sort by score
             results.sort((a,b) => b.total - a.total);
-
-            // Render
             let html = `<tr><th style="text-align:left">Player</th><th>Score</th></tr>`;
             results.forEach((r, idx) => {
                 let crown = (idx === 0) ? '👑 ' : '';
