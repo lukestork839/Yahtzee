@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Yah-douche-lick-it: Animated</title>
+    <title>Yah-douche-lick-it: Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         /* --- GLOBAL STYLES --- */
@@ -24,11 +24,35 @@
         .setup-box { background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         input[type="text"] { font-size: 18px; padding: 10px; margin: 5px; width: 80%; border: 1px solid #ccc; border-radius: 5px; }
         
-        /* GAME BOARD */
-        .game-header { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 10px; margin-bottom: 15px; }
+        /* GAME BOARD & HEADER */
+        .game-header { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 10px; margin-bottom: 10px; }
         .player-badge { font-weight: bold; font-size: 18px; color: #f1c40f; }
-        
-        .dice-container { display: flex; justify-content: center; gap: 8px; margin: 20px 0; min-height: 65px; }
+
+        /* NEW: LIVE LEADERBOARD STRIP */
+        .live-scoreboard {
+            display: flex; 
+            flex-wrap: wrap;
+            justify-content: center; 
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .score-pill { 
+            background: rgba(0,0,0,0.3); 
+            padding: 6px 12px; 
+            border-radius: 15px; 
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        .score-pill.active-turn {
+            background: #f1c40f;
+            color: #2c3e50;
+            font-weight: bold;
+            opacity: 1;
+            box-shadow: 0 0 5px #f1c40f;
+        }
+
+        /* DICE CONTAINER */
+        .dice-container { display: flex; justify-content: center; gap: 8px; margin: 15px 0; min-height: 65px; }
         
         .die {
             width: 55px; height: 55px;
@@ -44,11 +68,10 @@
 
         .die.held { background-color: #e74c3c; color: white; transform: translateY(8px); box-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
 
-        /* --- THE SHAKE ANIMATION --- */
+        /* SHAKE ANIMATION */
         .die.rolling {
             animation: rumble 0.5s linear infinite;
-            background-color: #ddd; /* Dim slightly while rolling */
-            color: transparent; /* Hide number while rolling */
+            background-color: #ddd; color: transparent;
         }
 
         @keyframes rumble {
@@ -98,8 +121,10 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
+        /* FINAL SCREEN */
+        .winner-banner { font-size: 24px; font-weight: bold; color: #f1c40f; margin-bottom: 20px; }
         .leaderboard-table td { font-size: 18px; padding: 10px; }
-        .winner { color: #f1c40f; font-weight: bold; }
+        .winner-row { background-color: #fef9e7; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -135,6 +160,9 @@
             <div class="player-badge" id="current-player-badge">Name</div>
         </div>
 
+        <div id="live-scoreboard" class="live-scoreboard">
+            </div>
+
         <div id="notification-area" style="background:#e74c3c; padding:10px; display:none; margin-bottom:10px; border-radius:5px;"></div>
 
         <div>Rolls: <span id="rolls-left">3</span></div>
@@ -157,8 +185,9 @@
     <div id="screen-over" class="screen">
         <h1>Game Over!</h1>
         <div class="setup-box">
-            <h3>Final Scores</h3>
-            <table class="leaderboard-table" id="final-table"></table>
+            <div id="winner-banner" class="winner-banner"></div>
+            <h3>Final Standings</h3>
+            <table class="leaderboard-table" id="final-table" style="width:100%"></table>
             <br>
             <button class="btn-main" onclick="location.reload()">Play Again</button>
         </div>
@@ -187,7 +216,7 @@
         let heldDice = [false,false,false,false,false];
         let rollsLeft = 3;
         let turnActive = false;
-        let isRolling = false; // Prevents spam clicking
+        let isRolling = false;
 
         function startGame() {
             players = [];
@@ -236,7 +265,11 @@
             document.getElementById('roll-btn').disabled = false;
             document.getElementById('roll-btn').innerText = "Roll Dice";
             document.getElementById('notification-area').style.display = 'none';
-            renderDice(); renderScorecard();
+            
+            renderDice(); 
+            renderScorecard();
+            renderLiveScoreboard(); // Update the top bar
+            
             showScreen('screen-game');
         }
 
@@ -246,28 +279,47 @@
             showPassScreen();
         }
 
-        // --- ANIMATED ROLL LOGIC ---
-        function rollDice() {
-            if(isRolling) return; // Prevent double clicks
+        // --- NEW HELPER: Get Total Score for a Player Object ---
+        function getPlayerTotal(p) {
+            let total = p.yahtzeeBonus + p.upperBonus;
+            Object.values(p.scores).forEach(v => { if(v!==null) total += v; });
+            return total;
+        }
+
+        // --- NEW RENDERER: The Top Bar Tally ---
+        function renderLiveScoreboard() {
+            const container = document.getElementById('live-scoreboard');
+            container.innerHTML = '';
             
+            players.forEach((p, index) => {
+                let total = getPlayerTotal(p);
+                let isActive = (index === currentPlayerIdx) ? 'active-turn' : '';
+                
+                // Create pill
+                let pill = document.createElement('div');
+                pill.className = `score-pill ${isActive}`;
+                pill.innerText = `${p.name}: ${total}`;
+                container.appendChild(pill);
+            });
+        }
+
+        // --- GAME LOGIC ---
+        function rollDice() {
+            if(isRolling) return;
             if(!turnActive && rollsLeft === 3) turnActive = true;
 
             if(rollsLeft > 0) {
-                isRolling = true; // Lock controls
+                isRolling = true;
                 rollsLeft--;
-                document.getElementById('roll-btn').disabled = true; // Disable button while shaking
+                document.getElementById('roll-btn').disabled = true;
 
-                // 1. ADD ANIMATION CLASS
+                // Anim
                 const diceElements = document.getElementById('dice-area').children;
                 for(let i=0; i<5; i++) {
-                    if(!heldDice[i]) {
-                        if(diceElements[i]) diceElements[i].classList.add('rolling');
-                    }
+                    if(!heldDice[i] && diceElements[i]) diceElements[i].classList.add('rolling');
                 }
 
-                // 2. WAIT FOR ANIMATION (600ms)
                 setTimeout(() => {
-                    // 3. UPDATE NUMBERS
                     let currentQueue = roundQueues[currentRound - 1];
                     for(let i=0; i<5; i++) {
                         if(!heldDice[i]) {
@@ -276,11 +328,9 @@
                         }
                     }
                     
-                    // 4. RENDER NEW STATE
-                    renderDice(); // This removes the old divs (and the 'rolling' class) automatically
+                    renderDice();
                     calculatePotentialScores();
-                    
-                    isRolling = false; // Unlock
+                    isRolling = false;
                     
                     if(rollsLeft > 0) {
                         document.getElementById('roll-btn').disabled = false;
@@ -288,12 +338,12 @@
                         document.getElementById('roll-btn').innerText = "Select Score";
                     }
 
-                }, 600); // 600ms delay matches the animation + a tiny pause
+                }, 600);
             }
         }
 
         function toggleHold(idx) {
-            if(!turnActive || isRolling) return; // Cannot hold while rolling
+            if(!turnActive || isRolling) return; 
             heldDice[idx] = !heldDice[idx];
             renderDice();
         }
@@ -318,6 +368,7 @@
             currentDice.forEach(x => counts[x]++);
             let isYahtzee = counts.some(c => c===5);
             let isJoker = false;
+            
             if(isYahtzee && p.scores['yahtzee'] === 50) {
                 isJoker = true;
                 document.getElementById('notification-area').innerText = "JOKER BONUS! (+100)";
@@ -379,6 +430,10 @@
             let upperSum = 0;
             ['ones','twos','threes','fours','fives','sixes'].forEach(k => { if(p.scores[k] !== null) upperSum += p.scores[k]; });
             p.upperBonus = (upperSum >= 63) ? 35 : 0;
+            
+            // Update tally for user to see before passing phone (optional, but nice)
+            renderLiveScoreboard();
+            
             nextPlayer();
         }
 
@@ -396,24 +451,33 @@
             ['ones','twos','threes','fours','fives','sixes'].forEach(k => { if(p.scores[k] !== null) upperSum += p.scores[k]; });
             document.getElementById('ui-upper-bonus').innerText = `${p.upperBonus} (Sum: ${upperSum})`;
             document.getElementById('ui-yahtzee-bonus').innerText = p.yahtzeeBonus;
-            let total = p.yahtzeeBonus + p.upperBonus;
-            Object.values(p.scores).forEach(v => { if(v!==null) total += v; });
+            
+            let total = getPlayerTotal(p);
             document.getElementById('ui-grand-total').innerText = total;
         }
 
         function endGame() {
             showScreen('screen-over');
             const table = document.getElementById('final-table');
+            const banner = document.getElementById('winner-banner');
+            
             let results = players.map(p => {
-                let total = p.yahtzeeBonus + p.upperBonus;
-                Object.values(p.scores).forEach(v => { if(v!==null) total += v; });
-                return { name: p.name, total: total };
+                return { name: p.name, total: getPlayerTotal(p) };
             });
+
+            // Sort descending
             results.sort((a,b) => b.total - a.total);
+
+            // Announce Winner
+            let winnerName = results[0].name;
+            let winnerScore = results[0].total;
+            banner.innerText = `🏆 The winner is ${winnerName} with ${winnerScore} points! 🏆`;
+
+            // Build Table
             let html = `<tr><th style="text-align:left">Player</th><th>Score</th></tr>`;
             results.forEach((r, idx) => {
                 let crown = (idx === 0) ? '👑 ' : '';
-                let winClass = (idx === 0) ? 'class="winner"' : '';
+                let winClass = (idx === 0) ? 'class="winner-row"' : '';
                 html += `<tr ${winClass}><td>${crown}${r.name}</td><td>${r.total}</td></tr>`;
             });
             table.innerHTML = html;
